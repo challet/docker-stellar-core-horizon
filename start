@@ -16,6 +16,7 @@ ENABLE_HORIZON_CAPTIVE_CORE=false
 ENABLE_CORE_MANUAL_CLOSE=false
 
 QUICKSTART_INITIALIZED=false
+RUN_POSTGRES=true
 CURRENT_POSTGRES_PID=""
 
 function main() {
@@ -24,21 +25,23 @@ function main() {
 	echo ""
 
 	process_args $*
-	if [ "$NETWORK" != "standalone" ] && [ "$ENABLE_HORIZON_CAPTIVE_CORE" = "true" ]; then
-	  echo "--enable-horizon-captive-core is only supported in the standalone network" >&2
-	  exit 1
-	fi
 
 	echo "mode: $STELLAR_MODE"
 	echo "network: $NETWORK ($NETWORK_PASSPHRASE)"
 
 	copy_defaults
-	init_db
-	init_stellar_core
+	if [ "RUN_POSTGRES" = "true" ]; then
+		init_db
+	fi
+	if  ["ENABLE_HORIZON_CAPTIVE_CORE" = "false"]; then
+		init_stellar_core
+	fi
 	init_horizon
-	copy_pgpass
-
-	stop_postgres  # this gets started in init_db
+	if [ "RUN_POSTGRES" = "true" ]; then
+		copy_pgpass
+		stop_postgres  # this gets started in init_db
+	fi
+	
 
 	# launch services
 	exec_supervisor
@@ -60,6 +63,9 @@ function process_args() {
 	  --standalone)
 	    NETWORK="standalone"
 	    ;;
+		--no-db)
+			RUN_POSTGRES=false
+			;;
     --protocol-version)
       export PROTOCOL_VERSION="$1"
       shift
@@ -74,6 +80,7 @@ function process_args() {
     --enable-core-manual-close)
       ENABLE_CORE_MANUAL_CLOSE=true
       ;;
+		)
 	  *)
 	    echo "Unknown container arg $ARG" >&2
 	    exit 1
@@ -154,8 +161,7 @@ function set_pg_password() {
 
 function copy_defaults() {
 	local CP="rsync -a"
-
-	if [ -d $PGHOME/etc ]; then
+	if [ -d $PGHOME/etc ] && [ "RUN_POSTGRES" = "true"]; then
 		echo "postgres: config directory exists, skipping copy"
 	else
 		$CP /opt/stellar-default/common/postgresql/ $PGHOME
@@ -291,12 +297,14 @@ export STELLAR_CORE_BINARY_PATH=/usr/bin/stellar-core
 export STELLAR_CORE_CONFIG_PATH=/opt/stellar/core/etc/stellar-captive-core.cfg
 EOF
 	fi
-
-	start_postgres
+	
+	if [ $RUN_POSTGRES = "true" ]; then
+		start_postgres
+	fi
 	run_silent "init-horizon-db" sudo -u stellar ./bin/horizon db init
 	if [ "$NETWORK" == "standalone" ]; then
 		# init-genesis-state command has not been released yet so ignore error and remove `|| true` later.
-		run_silent "init-genesis-state" sudo -u stellar ./bin/horizon expingest init-genesis-state || true
+		run_silent "init-genesis-state" sudo -u stellar ./bin/horizon ingest init-genesis-state || true
 	fi
 
 	touch .quickstart-initialized
@@ -322,6 +330,12 @@ function upgrade_standalone() {
 
 function exec_supervisor() {
 	echo "starting supervisor"
+	if ["RUN_POSTGRES" = "false"]; then
+		rm /opt/stellar-default/common/supervisor/supervisord.d/postgresql
+	fi
+	if ["ENABLE_HORIZON_CAPTIVE_CORE" = "true"]; then
+		rm /opt/stellar-default/common/supervisor/supervisord.d/postgresql
+	fi
 	upgrade_standalone &
 	exec supervisord -n -c $SUPHOME/etc/supervisord.conf
 }

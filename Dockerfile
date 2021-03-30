@@ -1,15 +1,12 @@
 FROM ubuntu:20.04
 
-MAINTAINER Bartek Nowotarski <bartek@stellar.org>
+MAINTAINER Clément Hallet <clement@challet.eu>
 
-ENV STELLAR_CORE_VERSION 15.3.0-469.6b99ef8.focal
-ENV HORIZON_VERSION 1.14.0-44
+ENV STELLAR_CORE_VERSION 15.4.0-569.ff56e7f.focal
+ENV HORIZON_VERSION 2.1.0-57
 
-EXPOSE 5432
-EXPOSE 8000
-EXPOSE 6060
-EXPOSE 11625
-EXPOSE 11626
+# horizon API
+EXPOSE 8000 
 
 ADD dependencies /
 RUN ["chmod", "+x", "dependencies"]

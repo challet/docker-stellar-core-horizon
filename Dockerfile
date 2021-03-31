@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 MAINTAINER Clément Hallet <clement@challet.eu>
 
-ENV STELLAR_CORE_VERSION 15.4.0-569.ff56e7f.focal
+ENV STELLAR_CORE_VERSION 15.4.0
 ENV HORIZON_VERSION 2.1.0-57
 
 # horizon API
